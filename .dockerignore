@@ -1,0 +1,51 @@
+# Docker ignore file for IBus project
+
+# Git files
+.git
+.gitignore
+.github
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.so.*
+*.la
+*.lo
+autom4te.cache/
+config.log
+config.status
+config.h
+stamp-h1
+libtool
+Makefile
+.deps/
+.libs/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation build
+docs/reference/html/
+docs/reference/xml/
+
+# Test files
+test-*.log
+test-*.trs
+
+# Backup files
+*.bak
+*.orig
+
+# Distribution files
+*.tar.gz
+*.tar.bz2
+*.tar.xz
