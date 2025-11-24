@@ -1,0 +1,84 @@
+# Simplified Dockerfile for building IBus project (build only, no tests)
+# Based on the CI workflow configuration
+
+FROM ubuntu:jammy
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV UCD_DIR=/usr/share/unicode
+
+# Update package manager and install dependencies
+RUN apt-get update -qq -y && \
+    apt-get install -y \
+    git \
+    build-essential \
+    autotools-dev \
+    automake \
+    autopoint \
+    libtool \
+    gettext \
+    intltool \
+    pkg-config \
+    desktop-file-utils \
+    dbus-x11 \
+    gobject-introspection \
+    gtk-doc-tools \
+    iso-codes \
+    libdconf-dev \
+    libdbusmenu-gtk3-dev \
+    libgirepository1.0-dev \
+    libglib2.0-dev \
+    libgtk-3-bin \
+    libgtk-3-dev \
+    libgtk-4-dev \
+    libgtk2.0-dev \
+    libnotify-dev \
+    libwayland-dev \
+    python-gi-dev \
+    python3-all \
+    python3-dev \
+    systemd \
+    unicode-cldr-core \
+    unicode-data \
+    valac \
+    valac-0.56-vapi \
+    wayland-protocols \
+    wget \
+    dconf-cli \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy source code
+COPY . .
+
+# Download wayland-client.vapi if not available
+RUN if ! ls /usr/share/vala-*/vapi/wayland-client.vapi; then \
+    wget https://gitlab.gnome.org/GNOME/vala/-/raw/0.56/vapi/wayland-client.vapi && \
+    mv wayland-client.vapi bindings/vala/.; \
+    fi
+
+# Configure git safe directory
+RUN git config --global --add safe.directory /workspace
+
+# Run autogen.sh
+RUN ./autogen.sh \
+    --enable-gtk-doc \
+    --with-python=/usr/bin/python3 \
+    --with-ucd-dir=${UCD_DIR} \
+    --enable-install-tests
+
+# Build the project
+RUN make -j$(nproc)
+
+# Install to /usr/local
+# Use DESTDIR to skip dconf update, then copy files to the real location
+RUN make install DESTDIR=/tmp/ibus-install && \
+    cp -a /tmp/ibus-install/usr/local/* /usr/local/ && \
+    cp -a /tmp/ibus-install/usr/lib/* /usr/lib/ 2>/dev/null || true && \
+    cp -a /tmp/ibus-install/etc/* /etc/ 2>/dev/null || true
+
+# Default command
+CMD ["ibus-daemon", "--help"]

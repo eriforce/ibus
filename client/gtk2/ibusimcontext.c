@@ -1648,6 +1648,24 @@ ibus_im_context_set_client_window (GtkIMContext *context,
 #endif
 }
 
+static gboolean
+_is_cinnamon_desktop (void)
+{
+    static gint is_cinnamon = -1;
+    
+    if (is_cinnamon == -1) {
+        const gchar *desktop = g_getenv ("XDG_CURRENT_DESKTOP");
+        if (desktop && g_ascii_strcasecmp (desktop, "X-Cinnamon") == 0) {
+            is_cinnamon = 1;
+        } else {
+            const gchar *session = g_getenv ("XDG_SESSION_DESKTOP");
+            is_cinnamon = (session && g_ascii_strcasecmp (session, "cinnamon") == 0) ? 1 : 0;
+        }
+    }
+    
+    return is_cinnamon == 1;
+}
+
 static void
 _set_rect_scale_factor_with_window (GdkRectangle *area,
 #if GTK_CHECK_VERSION (3, 98, 4)
@@ -1669,6 +1687,15 @@ _set_rect_scale_factor_with_window (GdkRectangle *area,
 
     scale_factor = gdk_window_get_scale_factor (window);
 #endif
+
+    /* Cinnamon already handles HiDPI scaling correctly for cursor locations,
+     * so we should not apply additional scaling to avoid candidate window
+     * positioning issues. */
+    if (_is_cinnamon_desktop () && scale_factor > 1) {
+        /* Don't apply scaling in Cinnamon HiDPI environment */
+        return;
+    }
+
     area->x *= scale_factor;
     area->y *= scale_factor;
     area->width *= scale_factor;
@@ -1739,7 +1766,23 @@ _set_cursor_location_internal (IBusIMContext *ibusimcontext)
                                 &area.x, &area.y);
 #endif
 
-    _set_rect_scale_factor_with_window (&area, ibusimcontext->client_window);
+
+    // For Cinnamon with HiDPI, we skip applying scaling in _set_rect_scale_factor_with_window
+    // but we also need to handle the case where we're not calling that function at all
+    gboolean is_cinnamon_hidpi = FALSE;
+#if GTK_CHECK_VERSION (3, 10, 0)
+    int scale_factor = 1;
+#if GTK_CHECK_VERSION (3, 98, 4)
+    scale_factor = gtk_widget_get_scale_factor (ibusimcontext->client_window);
+#else
+    scale_factor = gdk_window_get_scale_factor (ibusimcontext->client_window);
+#endif
+    is_cinnamon_hidpi = _is_cinnamon_desktop() && scale_factor > 1;
+#endif
+    
+    if (!is_cinnamon_hidpi) {
+        _set_rect_scale_factor_with_window (&area, ibusimcontext->client_window);
+    }
 
 #ifdef GDK_WINDOWING_WAYLAND
 #if !GTK_CHECK_VERSION (3, 98, 4)
